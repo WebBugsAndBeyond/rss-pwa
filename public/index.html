@@ -53,9 +53,6 @@
             rss-feed-item-accordion::part(header) {
                 background-color: mintcream;
             }
-            rss-feed-item-accordion::part(content) {
-                
-            }
         </style>
     </head>
     <body>
@@ -372,15 +369,6 @@
                 const { message } = error;
                 console.log(message);
             });
-
-            // class RSSFeedItemElement extends HTMLElement {
-            //     constructor() {
-            //         super();
-            //         const templateElement = document.querySelector('#rss-item-template');
-            //         const shadowRoot = this.attachShadow({ mode: 'open' });
-            //         shadowRoot.appendChild(templateElement.content.cloneNode(true));
-            //     }
-            // }
 
             class RSSFeedItemAccordionElement extends HTMLElement {
                 constructor() {
