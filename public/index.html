@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>PWA RSS Reader</title>
+        <style>
+            body {
+                font-family: 'Courier New', Courier, monospace;
+            }
+            .app-shell__header,
+            .app-shell__footer {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                position: fixed;
+                left: 0;
+                right: 0;
+                height: 40px;
+                width: 100vw;
+                background-color: crimson;
+            }
+            .app-shell__header {
+                top: 0;
+                bottom: 40px;
+            }
+            .app-shell__header__site-title,
+            .app-shell__footer__copyright {
+                font-size: 24px;
+                line-height: 30px;
+                color: white;
+            }
+            .app-shell__footer__copyright {
+                font-size: 16px;
+            }
+            .app-shell__footer {
+                top: calc(100vh - 40px);
+                bottom: 100vh;
+            }
+            main {
+                position: fixed;
+                top: 40px;
+                left: 0;
+                right: 100vw;
+                bottom: calc(100vh - 40px);
+                width: 100vw;
+                height: calc(100vh - 40px - 40px);
+            }
+            .main-content__feed-accordion-wrapper {
+                position: relative;
+            }
+            rss-feed-item-accordion::part(header) {
+                background-color: mintcream;
+            }
+            rss-feed-item-accordion::part(content) {
+                
+            }
+        </style>
+    </head>
+    <body>
+        <header class="app-shell__header">
+            <h1 class="app-shell__header__site-title">PWA RSS Feed</h1>
+        </header>
+        <main>
+            <div class="main-content__feed-accordion-wrapper"></div>
+        </main>
+        <footer class="app-shell__footer">
+            <div class="app-shell__footer__copyright">
+                Copyright 2025, WebBugsAndBeyond.
+            </div>
+        </footer>
+        <template id="rss-item-accordion-template">
+            <style>
+                :host {
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 16px;
+                }
+                article {
+                    display: flex;
+                    flex-flow: column nowrap;
+                    width: 100%;
+                    border-bottom: black solid 1px;
+                }
+                article > h1 {
+                    font-size: 18px;
+                    line-height: 24px;
+                    height: 30px;
+                    display: inline-flex;
+                    justify-content: center;
+                    margin: 0;
+                }
+                article > h1 > button {
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 18px;
+                    line-height: 24px;
+                    border: none;
+                    width: 100%;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    background: transparent;
+                    text-align: left;
+                }
+                article > div {
+                    display: grid;
+                    opacity: 0;
+                    grid-template-rows: 0fr;
+                    transition-property: all;
+                    transition-duration: 0.5s;
+                    transition-timing-function: ease;
+                }
+                article > div > div {
+                    overflow: hidden;
+                }
+                article > div.expanded {
+                    grid-template-rows: 1fr;
+                    opacity: 1;
+                    padding: 10px;
+                }
+                article > div > div {
+                    display: block;
+                }
+                article > div > .creator {
+                    font-size: 18px;
+                }
+                article > div > .pub-date {
+                    font-size: 18px;
+                }
+                article > div > .category {
+                    font-size: 16px;
+                }
+                article > div > .link {
+                    font-size: 16px;
+                }
+                article > div .description {
+                    font-size: 12px;
+                }
+            </style>
+            <article>
+                <h1 part="header"><button class="title"><slot name="title"></slot></button></h1>
+                <div part="content">
+                    <div>
+                        <div class="creator"><slot name="creator"></slot></div>
+                        <div class="pub-date"><slot name="pubDate"></slot></div>
+                        <div class="category"><slot name="category"></slot></div>
+                        <div class="link"><slot name="link"></slot></div>
+                        <div class="description"><slot name="description"></slot></div>
+                    </div>
+                </div>
+            </article>
+        </template>
+        <script type="module">
+            const textNodeName = '#text';
+            const cdataSectionName = '#cdata-section';
+
+            function findNode(rootNode, nodeName) {
+                if (!rootNode) {
+                    return null;
+                }
+                if (rootNode.nodeName === nodeName) {
+                    return rootNode;
+                }
+                const { childNodes } = rootNode;
+                for (const node of childNodes) {
+                    const foundNode = findNode(node, nodeName);
+                    if (foundNode) {
+                        return foundNode;
+                    }
+                }
+                return null;
+            }
+
+            function parseTitleElement(element) {
+                const titleTextNode = findNode(element, textNodeName);
+                const titleText = titleTextNode?.nodeValue ?? '';
+                return {
+                    title: titleText,
+                };
+            }
+
+            function parseLinkElement(element) {
+                const linkTextNode = findNode(element, textNodeName);
+                const linkText = linkTextNode?.nodeValue ?? '';
+                return {
+                    link: linkText,
+                };
+            }
+
+            function parseCreatorElement(element) {
+                const creatorCdataNode = findNode(element, cdataSectionName);
+                const creatorCdata = creatorCdataNode?.nodeValue ?? '';
+                return {
+                    creator: creatorCdata,
+                };
+            }
+
+            function parsePubDateElement(element) {
+                const pubDateTextNode = findNode(element, textNodeName);
+                const pubDateText = pubDateTextNode?.nodeValue ?? '';
+                return {
+                    pubDate: pubDateText,
+                };
+            }
+
+            function parseCategoryElement(element) {
+                const categoryCdataNode = findNode(element, cdataSectionName);
+                const categoryCdata = categoryCdataNode?.nodeValue ?? '';
+                return {
+                    category: categoryCdata,
+                };
+            }
+
+            function parseGuidElement(element) {
+                const isPermaLink = element.getAttribute('isPermaLink');
+                const guidTextNode = findNode(element, textNodeName);
+                const guidText = guidTextNode?.nodeValue ?? '';
+                return {
+                    isPermaLink,
+                    guid: guidText,
+                };
+            }
+
+            function parseDescriptionElement(element) {
+                const descriptionTextNode = findNode(element, cdataSectionName);
+                const descriptionText = descriptionTextNode?.nodeValue ?? '';
+                return {
+                    description: descriptionText,
+                };
+            }
+
+            function parseContentEncodedElement(element) {
+                const contentTextNode = findNode(element, cdataSectionName);
+                const contentText = contentTextNode?.nodeValue ?? '';
+                return {
+                    content: contentText,
+                };
+            }
+
+            function parsePostIdElement(element) {
+                const xmlNs = element.getAttribute('xmlns');
+                const postIdTextNode = findNode(element, textNodeName);
+                const postIdText = postIdTextNode?.nodeValue ?? '';
+                return {
+                    postId: postIdText,
+                };
+            }
+
+            function elementParser(element) {
+                const { tagName } = element;
+                switch (tagName) {
+                    case 'title':
+                        return parseTitleElement(element);
+                    case 'link':
+                        return parseLinkElement(element);
+                    case 'dc:creator':
+                        return parseCreatorElement(element);
+                    case 'pubDate':
+                        return parsePubDateElement(element);
+                    case 'category':
+                        return parseCategoryElement(element);
+                    case 'guid':
+                        return parseGuidElement(element);
+                    case 'description':
+                        return parseDescriptionElement(element);
+                    case 'content:encoded':
+                        return parseContentEncodedElement(element);
+                    case 'post-id':
+                        return parsePostIdElement(element);
+                    default:
+                        return null;
+                }
+            }
+
+            function assembleItemElements(parsedItem, itemChildElements) {
+                const parsed = itemChildElements.reduce((carry, current) => {
+                    const parsedElementValue = elementParser(current);
+                    for (const prop in parsedElementValue) {
+                        if (carry.hasOwnProperty(prop)) {
+                            if (Array.isArray(carry[prop])) {
+                                carry[prop] = [...carry[prop], parsedElementValue[prop]];
+                            } else {
+                                carry[prop] = [carry[prop], parsedElementValue[prop]];
+                            }
+                        } else {
+                            carry = {
+                                ...carry,
+                                [prop]: parsedElementValue[prop],
+                            };
+                        }
+                    }
+                    return carry;
+                }, parsedItem);
+                return parsed;
+            }
+
+            function parseRSSItem(itemNode) {
+                const childElements = Array.from(itemNode.children);
+                const parsedItem = assembleItemElements({}, childElements);
+                return parsedItem;
+            }
+
+            function renderRSSAccordionItem(item) {
+                const accordionElement = document.createElement('rss-feed-item-accordion');
+                
+                const titleElement = document.createElement('span');
+                titleElement.setAttribute('slot', 'title');
+                titleElement.textContent = item.title;
+                accordionElement.appendChild(titleElement);
+
+                const createdElement = document.createElement('span');
+                createdElement.setAttribute('slot', 'creator');
+                createdElement.textContent = item.creator;
+                accordionElement.appendChild(createdElement);
+
+                const pubDateElement = document.createElement('span');
+                pubDateElement.setAttribute('slot', 'pubDate');
+                pubDateElement.textContent = item.pubDate;
+                accordionElement.appendChild(pubDateElement);
+                
+                const categoryElement = document.createElement('span');
+                categoryElement.setAttribute('slot', 'category');
+                if (item.category) {
+                    if (Array.isArray(item.category)) {
+                        categoryElement.innerHTML = item.category.join(' ');
+                    } else {
+                        categoryElement.textContent = item.category;
+                    }
+                }
+                accordionElement.appendChild(categoryElement);
+
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('slot', 'link');
+                linkElement.setAttribute('href', item.link);
+                linkElement.textContent = item.link;
+                accordionElement.appendChild(linkElement);
+
+                const descriptionElement = document.createElement('div');
+                descriptionElement.setAttribute('slot', 'description');
+                descriptionElement.innerHTML = item.description;
+                accordionElement.appendChild(descriptionElement);
+                
+                return accordionElement;
+            }
+
+            function renderRSSAccordion(items) {
+                const renderedItems = items.map(renderRSSAccordionItem);
+                const accordionWrapper = document.querySelector(".main-content__feed-accordion-wrapper");
+                if (accordionWrapper) {
+                    accordionWrapper.append(...renderedItems);
+                }
+            }
+
+            const feedUrl = 'http://localhost:8080/feed';
+            fetch(feedUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/xml',
+                },
+            }).then(
+                response => response.text()
+            ).then(xmlText => {
+                const domParser = new DOMParser();
+                const xmlDocument = domParser.parseFromString(xmlText, 'text/xml');
+                const rssElement = xmlDocument.documentElement;
+                const itemNodes = rssElement.querySelectorAll('channel > item');
+                const feedItems = Array.from(itemNodes).map(parseRSSItem);
+                console.log(feedItems);
+                renderRSSAccordion(feedItems);
+            }).catch((error) => {
+                debugger;
+                const { message } = error;
+                console.log(message);
+            });
+
+            // class RSSFeedItemElement extends HTMLElement {
+            //     constructor() {
+            //         super();
+            //         const templateElement = document.querySelector('#rss-item-template');
+            //         const shadowRoot = this.attachShadow({ mode: 'open' });
+            //         shadowRoot.appendChild(templateElement.content.cloneNode(true));
+            //     }
+            // }
+
+            class RSSFeedItemAccordionElement extends HTMLElement {
+                constructor() {
+                    super();
+                    const templateElement = document.querySelector('#rss-item-accordion-template');
+                    const shadowRoot = this.attachShadow({ mode: 'open' });
+                    shadowRoot.appendChild(templateElement.content.cloneNode(true));
+                    this.handleToggleClick = this.handleToggleClick.bind(this);
+                }
+
+                handleToggleClick(mouseEvent) {
+                    const articleDiv = this.shadowRoot.querySelector('article > div');
+                    if (articleDiv) {
+                        articleDiv.classList.toggle('expanded');
+                    }
+                }
+
+                connectedCallback() {
+                    const height = this.shadowRoot.querySelector('article > div')?.scrollHeight ?? 0;
+                    if (height) {
+                        const styleSheet = this.shadowRoot.styleSheets.item(0);
+                        let hostRule = null;
+                        for (let i = 0; i < styleSheet.cssRules.length; ++i) {
+                            const rule = styleSheet.cssRules.item(0);
+                            if (rule) {
+                                if (rule.selectorText === ':host') {
+                                    hostRule = rule;
+                                    break;
+                                }
+                            }
+                        }
+                        if (hostRule) {
+                            hostRule.style.setProperty('--expanded-height', `${height}px`);
+                        }
+                    }
+                    const toggleButton = this.shadowRoot.querySelector('article button');
+                    if (toggleButton) {
+                        toggleButton.addEventListener('click', this.handleToggleClick);
+                    }
+                }
+
+                disconnectCallback() {
+                    const toggleButton = this.shadowRoot.querySelector('article button');
+                    if (toggleButton) {
+                        toggleButton.removeEventListener('click', this.handleToggleClick);
+                    }
+                }
+            }
+
+            
+            window.customElements.define('rss-feed-item-accordion', RSSFeedItemAccordionElement);
+
+
+            function showUpdateNotification() {
+                // Notify user about app update
+                if (confirm('New version available. Update now?')) {
+                    window.location.reload();
+                }
+            }
+
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js', {
+                        scope: '/',
+                    }).then(registration => {
+                        console.log(`Service worker registered for the following scope: ${registration.scope}`);
+
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                console.log(`Worker state: ${newWorker.state}`);
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    showUpdateNotification();
+                                }
+                            });
+                        });
+                    })
+                })
+            }
+        </script>
+    </body>
+</html>
