@@ -5,15 +5,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>PWA RSS Reader</title>
         <style>
+            :root {
+                --add-button-size: 32px;
+            }
             body {
                 font-family: 'Courier New', Courier, monospace;
             }
             .app-shell__header,
             .app-shell__footer {
                 display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
                 position: fixed;
                 left: 0;
                 right: 0;
@@ -24,6 +24,40 @@
             .app-shell__header {
                 top: 0;
                 bottom: 40px;
+                display: flex;
+                flex-direction: row;
+            }
+            .app-shell__header > div > h1 {
+                margin: 0;
+                padding: 0;
+                position: relative;
+                left: calc(var(--add-button-size) / 2);
+            }
+            .app-shell__header > div {
+                display: flex;
+            }
+            .app-shell__header > div:first-of-type {
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                flex-basis: calc(100% - 24px);
+            }
+            .app-shell__header > div:last-of-type {
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                flex-basis: var(--add-button-size);
+            }
+            .app-shell__header > div:last-of-type > button {
+                font-size: var(--add-button-size);
+                line-height: var(--add-button-size);
+                width: var(--add-button-size);
+                height: var(--add-button-size);
+                margin: 0;
+                padding: 0;
+                color: white;
+                background-color: transparent;
+                border: none;
             }
             .app-shell__header__site-title,
             .app-shell__footer__copyright {
@@ -35,6 +69,9 @@
                 font-size: 16px;
             }
             .app-shell__footer {
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
                 top: calc(100vh - 40px);
                 bottom: 100vh;
             }
@@ -46,6 +83,7 @@
                 bottom: calc(100vh - 40px);
                 width: 100vw;
                 height: calc(100vh - 40px - 40px);
+                overflow-y: scroll;
             }
             .main-content__feed-accordion-wrapper {
                 position: relative;
@@ -57,7 +95,12 @@
     </head>
     <body>
         <header class="app-shell__header">
-            <h1 class="app-shell__header__site-title">PWA RSS Feed</h1>
+            <div>
+                <h1 class="app-shell__header__site-title">PWA RSS Feed</h1>
+            </div>
+            <div>
+                <button id="add-feed-url-dialog-open-button">+</button>
+            </div>
         </header>
         <main>
             <div class="main-content__feed-accordion-wrapper"></div>
@@ -147,159 +190,446 @@
                 </div>
             </article>
         </template>
-        <script type="module">
-            const textNodeName = '#text';
-            const cdataSectionName = '#cdata-section';
+        <template id="rss-channel-template">
+            <style>
+                :host {
+                    font-family: 'Courier New', Courier, monospace;
+                }
+                h1 {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                h2 {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    font-size: 14px;
+                    font-weight: normal;
+                }
+            </style>
+            <section>
+                <header>
+                    <h1><slot name="title"></slot></h1>
+                    <h2><slot name="description"></slot></h2>
+                </header>
+                <div><slot name="items"></slot></div>
+            </section>
+        </template>
+        <template id="user-input-dialog-template">
+            <style>
+                :host {
+                    width: 100vw;
+                    height: 100vh;
+                    box-sizing: border-box;
+                    padding: 0;
+                    margin: 0;
+                }
+                dialog {
+                    position: fixed;
+                    left: 0;
+                    top: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    padding: 0;
+                    margin: 0;
+                    opacity: 0;
+                    z-index: 2;
+                    transition-property: opacity;
+                    transition-duration: .5s;
+                    transition-timing-function: ease-in;
+                    background-color: darkblue;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    box-sizing: border-box;
+                }
+                dialog.visible {
+                    opacity: 1;
+                }
+                header {
+                    flex-basis: 10%;
+                    box-sizing: border-box;
+                    width: 100%;
+                    padding-left: 10px;
+                }
+                section.fields {
+                    flex-basis: 80%;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    box-sizing: border-box;
+                    width: 100%;
+                }
+                section.controls {
+                    flex-basis: 10%;
+                    box-sizing: border-box;
+                    width: 100%;
+                    display: flex;
+                }
+            </style>
+            <dialog>
+                <header>
+                    <slot name="header"></slot>
+                </header>
+                <section class="fields">
+                    <slot name="input-fields"></slot>
+                </section>
+                <section class="controls">
+                    <slot name="controls"></slot>
+                </section>
+            </dialog>
+        </template>
+        <template id="add-feed-url-dialog-template">
+            <style>
+                h1 {
+                    color: white;
+                    font-size: 36px;
+                }
+                .user-input-dialog__input-fields {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-around;
+                    align-items: start;
+                    padding: 10px;
+                    width: 100%;
+                    box-sizing: border-box;
 
-            function findNode(rootNode, nodeName) {
-                if (!rootNode) {
-                    return null;
                 }
-                if (rootNode.nodeName === nodeName) {
-                    return rootNode;
+                .user-input-dialog__input-fields > label {
+                    width: 100%;
+                    font-size: 20px;
+                    color: white;
+                    box-sizing: border-box;
                 }
-                const { childNodes } = rootNode;
-                for (const node of childNodes) {
-                    const foundNode = findNode(node, nodeName);
-                    if (foundNode) {
-                        return foundNode;
+                .user-input-dialog__input-fields > input {
+                    width: 100%;
+                    font-size: 24px;
+                    border-radius: 4px;
+                    box-sizing: border-box;
+                    height: 40px;
+                    border-style: solid;
+                    border-width: 1px;
+                    border-color: black;
+                }
+                .user-input-dialog__input-fields > input:focus {
+                    border-color: chartreuse;
+                }
+                div[slot="controls"] {
+                    display: flex;
+                    flex-direction: row;
+                    flex: 1;
+                }
+                button {
+                    flex-basis: 50%;
+                    font-weight: bold;
+                    font-family: inherit;
+                    margin: 0;
+                    border: 0;
+                    font-size: 24px;
+                    line-height: 36px;
+                    padding: 0;
+                }
+                .dialog-button__ok {
+                    background-color: yellow;
+                    color: red;
+                }
+                .dialog-button__ok:disabled {
+                    background-color:blanchedalmond;
+                    color:azure;
+                }
+                .dialog-button__cancel {
+                    background-color: brown;
+                    color: antiquewhite;
+                }
+            </style>
+            <user-input-dialog>
+                <h1 slot="header">Add Feed URL</h1>
+                <div slot="input-fields" class="user-input-dialog__input-fields">
+                    <label for="">Feed URL</label>
+                    <input 
+                        type="url"
+                        required
+                        id="feed-url-input-field"
+                        name="feedUrlInputField"
+                        maxlength="255"
+                        placeholder="Enter feed URL"
+                    >
+                </div>
+                <div slot="controls">
+                    <button class="dialog-button dialog-button__ok" disabled>Add</button>
+                    <button class="dialog-button dialog-button__cancel">Cancel</button>
+                </div>
+            </user-input-dialog>
+        </template>
+        <script type="module">
+
+            class RSSFeedItem {
+
+                static #textNodeName = '#text';
+                static #cdataSectionName = '#cdata-section';
+                static #isInternalConstructing = false;
+
+                #titleText = '';
+                #linkText = '';
+                #creatorCdata = '';
+                #pubDateText = '';
+                #categoryCdata = '';
+                #guidText = '';
+                #guidTextIsPermaLink = '';
+                #descriptionText = '';
+                #contentText = '';
+                #postIdText = '';
+
+                constructor(itemElement) {
+                    const childElements = Array.from(itemElement.children);
+                    for (const element of childElements) {
+                        this.#parseItemChildElement(element);
                     }
                 }
-                return null;
-            }
 
-            function parseTitleElement(element) {
-                const titleTextNode = findNode(element, textNodeName);
-                const titleText = titleTextNode?.nodeValue ?? '';
-                return {
-                    title: titleText,
-                };
-            }
-
-            function parseLinkElement(element) {
-                const linkTextNode = findNode(element, textNodeName);
-                const linkText = linkTextNode?.nodeValue ?? '';
-                return {
-                    link: linkText,
-                };
-            }
-
-            function parseCreatorElement(element) {
-                const creatorCdataNode = findNode(element, cdataSectionName);
-                const creatorCdata = creatorCdataNode?.nodeValue ?? '';
-                return {
-                    creator: creatorCdata,
-                };
-            }
-
-            function parsePubDateElement(element) {
-                const pubDateTextNode = findNode(element, textNodeName);
-                const pubDateText = pubDateTextNode?.nodeValue ?? '';
-                return {
-                    pubDate: pubDateText,
-                };
-            }
-
-            function parseCategoryElement(element) {
-                const categoryCdataNode = findNode(element, cdataSectionName);
-                const categoryCdata = categoryCdataNode?.nodeValue ?? '';
-                return {
-                    category: categoryCdata,
-                };
-            }
-
-            function parseGuidElement(element) {
-                const isPermaLink = element.getAttribute('isPermaLink');
-                const guidTextNode = findNode(element, textNodeName);
-                const guidText = guidTextNode?.nodeValue ?? '';
-                return {
-                    isPermaLink,
-                    guid: guidText,
-                };
-            }
-
-            function parseDescriptionElement(element) {
-                const descriptionTextNode = findNode(element, cdataSectionName);
-                const descriptionText = descriptionTextNode?.nodeValue ?? '';
-                return {
-                    description: descriptionText,
-                };
-            }
-
-            function parseContentEncodedElement(element) {
-                const contentTextNode = findNode(element, cdataSectionName);
-                const contentText = contentTextNode?.nodeValue ?? '';
-                return {
-                    content: contentText,
-                };
-            }
-
-            function parsePostIdElement(element) {
-                const xmlNs = element.getAttribute('xmlns');
-                const postIdTextNode = findNode(element, textNodeName);
-                const postIdText = postIdTextNode?.nodeValue ?? '';
-                return {
-                    postId: postIdText,
-                };
-            }
-
-            function elementParser(element) {
-                const { tagName } = element;
-                switch (tagName) {
-                    case 'title':
-                        return parseTitleElement(element);
-                    case 'link':
-                        return parseLinkElement(element);
-                    case 'dc:creator':
-                        return parseCreatorElement(element);
-                    case 'pubDate':
-                        return parsePubDateElement(element);
-                    case 'category':
-                        return parseCategoryElement(element);
-                    case 'guid':
-                        return parseGuidElement(element);
-                    case 'description':
-                        return parseDescriptionElement(element);
-                    case 'content:encoded':
-                        return parseContentEncodedElement(element);
-                    case 'post-id':
-                        return parsePostIdElement(element);
-                    default:
-                        return null;
+                get title() {
+                    return this.#titleText;
                 }
-            }
+                get link() {
+                    return this.#linkText;
+                }
+                get creator() {
+                    return this.#creatorCdata;
+                }
+                get pubDate() {
+                    return this.#pubDateText;
+                }
+                get category() {
+                    return this.#categoryCdata;
+                }
+                get guid() {
+                    return {
+                        isPermaLink: this.#guidTextIsPermaLink,
+                        text: this.#guidText,
+                    };
+                }
+                get description() {
+                    return this.#descriptionText;
+                }
+                get content() {
+                    return this.#contentText;
+                }
+                get postId() {
+                    return this.#postIdText;
+                }
 
-            function assembleItemElements(parsedItem, itemChildElements) {
-                const parsed = itemChildElements.reduce((carry, current) => {
-                    const parsedElementValue = elementParser(current);
-                    for (const prop in parsedElementValue) {
-                        if (carry.hasOwnProperty(prop)) {
-                            if (Array.isArray(carry[prop])) {
-                                carry[prop] = [...carry[prop], parsedElementValue[prop]];
-                            } else {
-                                carry[prop] = [carry[prop], parsedElementValue[prop]];
-                            }
-                        } else {
-                            carry = {
-                                ...carry,
-                                [prop]: parsedElementValue[prop],
-                            };
+                #findNode(rootNode, nodeName) {
+                    if (!rootNode) {
+                        return null;
+                    }
+                    if (rootNode.nodeName === nodeName) {
+                        return rootNode;
+                    }
+                    const { childNodes } = rootNode;
+                    for (const node of childNodes) {
+                        const foundNode = this.#findNode(node, nodeName);
+                        if (foundNode) {
+                            return foundNode;
                         }
                     }
-                    return carry;
-                }, parsedItem);
-                return parsed;
+                    return null;
+                }
+                
+                #parseItemChildElement(element) {
+                    const { tagName } = element;
+                    switch (tagName) {
+                        case 'title':
+                            this.#titleText = this.#findNode(
+                                element,
+                                RSSFeedItem.#textNodeName,
+                            )?.nodeValue ?? '';
+                            break;
+                        case 'link':
+                            this.#linkText = this.#findNode(
+                                element,
+                                RSSFeedItem.#textNodeName,
+                            )?.nodeValue ?? '';
+                            break;
+                        case 'dc:creator':
+                            this.#creatorCdata = this.#findNode(
+                                element,
+                                RSSFeedItem.#cdataSectionName,
+                            )?.nodeValue ?? '';
+                            break;
+                        case 'pubDate':
+                            this.#pubDateText = this.#findNode(
+                                element,
+                                RSSFeedItem.#textNodeName,
+                            )?.nodeValue ?? '';
+                            break;
+                        case 'category':
+                            ((nodeValue) => {
+                                if (this.#categoryCdata !== '') {
+                                    this.#categoryCdata += ',' + nodeValue;
+                                } else {
+                                    this.#categoryCdata = nodeValue;
+                                }
+                            })(this.#findNode(
+                                element,
+                                RSSFeedItem.#cdataSectionName,
+                            )?.nodeValue ?? '');
+                            break;
+                        case 'guid':
+                            this.#guidTextIsPermaLink = element.getAttribute('isPermaLink');
+                            this.#guidText = this.#findNode(
+                                element,
+                                RSSFeedItem.#textNodeName,
+                            )?.nodeValue ?? '';
+                            break;
+                        case 'description':
+                            this.#descriptionText = this.#findNode(
+                                element,
+                                RSSFeedItem.#cdataSectionName,
+                            )?.nodeValue ?? '';
+                            break;
+                        case 'content:encoded':
+                            this.#contentText = this.#findNode(
+                                element,
+                                RSSFeedItem.#cdataSectionName,
+                            )?.nodeValue ?? '';
+                            break;
+                        case 'post-id':
+                            this.#postIdText = this.#findNode(
+                                element,
+                                RSSFeedItem.#textNodeName,
+                            )?.nodeValue ?? '';
+                            break;
+                    }
+                }
             }
 
-            function parseRSSItem(itemNode) {
-                const childElements = Array.from(itemNode.children);
-                const parsedItem = assembleItemElements({}, childElements);
-                return parsedItem;
+            class RSSFeedChannel {
+
+                #titleText = '';
+                #descriptionText = '';
+                #lastBuildDateText = '';
+                #feedUrlText = '';
+                #feedItems = [];
+                #updateFrequencyText = '';
+                #updatePeriodText = '';
+                #updateBaseText = '';
+
+                constructor(feedUrl, xmlText) {
+                    this.#feedUrlText = feedUrl;
+
+                    const domParser = new DOMParser();
+                    const xmlDocument = domParser.parseFromString(xmlText, 'application/xml');
+                    const rssElement = xmlDocument.documentElement;
+                    const channelTitleElement = rssElement.querySelector('channel > title');
+                    const channelLastBuildElement = rssElement.querySelector('channel > lastBuildDate');
+                    const channelDescriptionElement = rssElement.querySelector('channel > description');
+                    const itemNodes = rssElement.querySelectorAll('channel > item');
+                    const feedItems = Array.from(itemNodes).map(RSSFeedChannel.#parseRSSItem);
+                    this.#titleText = channelTitleElement?.textContent ?? '';
+                    this.#descriptionText = channelDescriptionElement?.textContent ?? '';
+                    this.#feedItems = feedItems;
+
+                }
+
+                static #parseRSSItem(itemNode) {
+                    const rssFeedItem = new RSSFeedItem(itemNode);
+                    return rssFeedItem;
+                }
+
+                get title() {
+                    return this.#titleText;
+                }
+
+                get description() {
+                    return this.#descriptionText;
+                }
+
+                get lastBuildDate() {
+                    return this.#lastBuildDateText;
+                }
+
+                get updateBase() {
+                    return this.#updateBaseText;
+                }
+
+                get feedUrl() {
+                    return this.#feedUrlText;
+                }
+
+                get items() {
+                    return this.#feedItems;
+                }
+
+                get updatePeriod() {
+                    return this.#updatePeriodText;
+                }
+
+                get updateFrequency() {
+                    return this.#updateFrequencyText;
+                }
+
+                getSerializableObject() {
+                    const value = {
+                        title: this.title,
+                        feedUrl: this.feedUrl,
+                        lastBuildDate: this.lastBuildDate || this.updateBase,
+                        updatePeriod: this.updatePeriod,
+                        updateFrequency: this.updateFrequency,
+                        nextUpdateDate: this.nextUpdateDate,
+                    };
+                    return value;
+                }
+
+                get nextUpdateDate() {
+                    if (!this.lastBuildDate || !this.updateBase) {
+                        return new Date();
+                    }
+                    const buildDate = this.lastBuildDate ? new Date(this.lastBuildDate) : new Date(this.updateBase);
+                    const daysInMonth = {
+                        0: 31,
+                        1: (buildDate.getFullYear() % 4 ? 29 : 28),
+                        2: 31,
+                        3: 30,
+                        4: 31,
+                        5: 31,
+                        6: 30,
+                        7: 31,
+                        8: 30,
+                        9: 31,
+                        10: 30,
+                        11: 31,
+                    };
+                    const updatePeriods = ['hourly', 'daily', 'weekly', 'monthly', 'yearly'];
+                    const updatePeriodMilliseconds = {
+                        hourly: 1000 * 60 * 60,
+                        daily: 1000 * 60 * 60 * 24,
+                        weekly: 1000 * 60 * 60 * 24 * 7,
+                        monthly: 1000 * 60 * 60 * 24 * daysInMonth[buildDate.getMonth()],
+                        yearly: 1000 * 60 * 60 * 24 * (buildDate.getFullYear() % 4 ? 366 : 365),
+                    };
+                    const buildTimeMilliseconds = buildDate.getTime();
+                    const nextPeriodMillisecondsOffset = updatePeriodMilliseconds[this.updatePeriod];
+                    const nextPeriodMillisecondsTimesFrequency = nextPeriodMillisecondsOffset * Number(this.updateFrequency);
+                    const nextUpdateTimeMilliseconds = buildTimeMilliseconds + nextPeriodMillisecondsTimesFrequency;
+                    const nextUpdateDate = new Date(nextUpdateTimeMilliseconds);
+                    return nextUpdateDate;
+                }
+
+                get isNextUpdateReady() {
+                    const updateDate = this.nextUpdateDate();
+                    const currentDate = Date.now();
+                    const differenceInMilliseconds = currentDate - updateDate.getTime();
+                    const updateIsInThePastOrNow = differenceInMilliseconds >= 0;
+                    return updateIsInThePastOrNow;
+                }
             }
 
             function renderRSSAccordionItem(item) {
                 const accordionElement = document.createElement('rss-feed-item-accordion');
-                
+                accordionElement.setAttribute('slot', 'items');
                 const titleElement = document.createElement('span');
                 titleElement.setAttribute('slot', 'title');
                 titleElement.textContent = item.title;
@@ -329,6 +659,7 @@
                 const linkElement = document.createElement('a');
                 linkElement.setAttribute('slot', 'link');
                 linkElement.setAttribute('href', item.link);
+                linkElement.setAttribute('target', '_blank');
                 linkElement.textContent = item.link;
                 accordionElement.appendChild(linkElement);
 
@@ -340,7 +671,7 @@
                 return accordionElement;
             }
 
-            function renderRSSAccordion(items) {
+            function renderRSSAccordion(items, parent) {
                 const renderedItems = items.map(renderRSSAccordionItem);
                 const accordionWrapper = document.querySelector(".main-content__feed-accordion-wrapper");
                 if (accordionWrapper) {
@@ -348,27 +679,287 @@
                 }
             }
 
-            const feedUrl = 'http://localhost:8080/feed';
-            fetch(feedUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/xml',
-                },
-            }).then(
-                response => response.text()
-            ).then(xmlText => {
-                const domParser = new DOMParser();
-                const xmlDocument = domParser.parseFromString(xmlText, 'text/xml');
-                const rssElement = xmlDocument.documentElement;
-                const itemNodes = rssElement.querySelectorAll('channel > item');
-                const feedItems = Array.from(itemNodes).map(parseRSSItem);
-                console.log(feedItems);
-                renderRSSAccordion(feedItems);
-            }).catch((error) => {
-                debugger;
-                const { message } = error;
-                console.log(message);
-            });
+            class LocalStorageStateManager {
+                
+                /**
+                 * Return a deserialized object from local storage.
+                 * @param {string} id Storage item key.
+                 * @returns {object}
+                 * @throws {ReferenceError} A ReferenceError is thrown if window.localStorage is not defined.
+                 */
+                loadObject(id) {
+                    if (window.localStorage) {
+                        const serializedObject = window.localStorage.getItem(id);
+                        const parsedObject = JSON.parse(serializedObject);
+                        return parsedObject;
+                    }
+                    throw new ReferenceError('Local storage is not supported.');
+                }
+
+                /**
+                 * Serializes an object to local storage with a given identifier.
+                 * @param {string} id Storage item key.
+                 * @param {object} dataObject Object to store in local storage as a JSON string.
+                 * @returns {undefined}
+                 * @throws {ReferenceError} A ReferenceError is thrown if window.localStorage is not supported.
+                 */
+                storeObject(id, dataObject) {
+                    if (window.localStorage) {
+                        const serializedObject = JSON.stringify(dataObject);
+                        window.localStorage.setItem(id, serializedObject);
+                        return;
+                    }
+                    throw new ReferenceError('Local storage is not supported');
+                }
+            }
+
+            class Application {
+                static #privateInitialization = false;
+                static #configuredStorageManager = LocalStorageStateManager;
+                static #appStateStorageKey = 'appState';
+                static #instance = null;
+
+                #stateManager = null;
+                #channels = [];
+
+                constructor(stateManagerImpl) {
+                    if (!Application.#privateInitialization) {
+                        throw new Error('Direct public instantiation of Application singleton is forbidden');
+                    }
+                    Application.#privateInitialization = false;
+                    this.#stateManager = stateManagerImpl;
+                    this.onShowAddURLDialogButtonClick = this.onShowAddURLDialogButtonClick.bind(this);
+                }
+
+                static configureStorageManager(storageManagerImpl) {
+                    const isFunction = typeof storageManagerImpl === 'function';
+                    const hasLoadObjectFunction = typeof storageManagerImpl?.prototype?.loadObject === 'function';
+                    const hasStoreObjectFunction = typeof storageManagerImpl?.prototype?.storeObject === 'function';
+                    if (isFunction && hasLoadObjectFunction && hasStoreObjectFunction) {
+                        this.#configuredStorageManager = storageManagerImpl;
+                    }
+                }
+
+                static getInstance() {
+                    if (this.#instance) {
+                        return this.#instance;
+                    }
+                    this.#privateInitialization = true;
+                    const storageManagerImpl = new this.#configuredStorageManager();
+                    this.#instance = new Application(storageManagerImpl);
+                    return this.#instance;
+                }
+
+                /**
+                 * Load the last serialized application state using the configured state manager.
+                 * @returns {Application}
+                 * @throws
+                 */ 
+                loadApplicationState() {
+                    const appState = this.#stateManager.loadObject(Application.#appStateStorageKey);
+                    if (Array.isArray(appState?.channels)) {
+                        this.#channels = [...appState.channels];
+                    }
+                    return this;
+                }
+
+                /**
+                 * Serializes the current state using the configured state manager.
+                 * @returns {Application}
+                 * @throws
+                 */
+                storeApplicationState() {
+                    const serializableState = {
+                        channels: this.#channels.filter(
+                            channel => channel instanceof RSSFeedChannel
+                        ).map(
+                            channel => channel.getSerializableObject()
+                        ),
+                    };
+                    this.#stateManager.storeObject(
+                        Application.#appStateStorageKey,
+                        serializableState,
+                    );
+                    return this;
+                }
+
+                /**
+                 * Determines whether or not the user input dialog for adding RSS feed URLs exists in the DOM.
+                 * @returns {boolean}
+                 */ 
+                doesAddFeedURLDialogExist() {
+                    const dialogElementName = 'add-feed-url-dialog';
+                    return !!document.querySelector(dialogElementName);
+                }
+
+                /**
+                 * Add the user input dialog for adding RSS feed URLs into the DOM.
+                 * @returns {AddFeedURLDialogElement}
+                 */
+                addAddFeedURLDialog() {
+                    const dialogElementName = 'add-feed-url-dialog';
+                    let dialogElement = document.querySelector(dialogElementName);
+                    if (dialogElement) {
+                        return dialogElement;
+                    }
+                    dialogElement = document.createElement(dialogElementName);
+                    document.body.appendChild(dialogElement);
+                    return dialogElement;
+                }
+
+                /**
+                 * Removes the user input dialog for adding RSS feed URLs from the DOM.
+                 */ 
+                removeAddFeedURLDialog() {
+                    const dialogElementName = 'add-feed-url-dialog';
+                    const dialogElement = document.body.querySelector(dialogElementName);
+                    if (dialogElement) {
+                        document.body.removeChild(dialogElement);
+                    }
+                }
+
+                /**
+                 * Shows the user input dialog for adding RSS feed URLs ensuring that it is in the DOM first.
+                 * Returns a Promise that is resolved with a reference to the custom element instance
+                 * when the visual style transition completes.
+                 * @returns {Promise<AddFeedURLDialogElement>}
+                 */ 
+                showAddFeedURLDialog() {
+                    const dialogElement = this.addAddFeedURLDialog();
+                    return dialogElement.show();
+                }
+
+                /**
+                 * Hides and removes the user input dialog for adding RSS feed URLs.
+                 * @returns {Application}
+                 */ 
+                hideAddFeedURLDialog() {
+                    const dialogElementName = 'add-feed-url-dialog';
+                    const dialogElement = document.body.querySelector(dialogElementName);
+                    if (dialogElement) {
+                        dialogElement.hide().finally(() => {
+                            this.removeAddFeedURLDialog();
+                            this.handleShowAddURLDialogButtonClick();
+                        });
+                    }
+                    return this;
+                }
+
+                /**
+                 * Show the user input dialog for adding RSS feed URLs if it does not already exist.
+                 */ 
+                onShowAddURLDialogButtonClick() {
+                    if (!this.doesAddFeedURLDialogExist()) {
+                        this.showAddFeedURLDialog();
+                    }
+                }
+
+                /**
+                 * Adds the click event handler to the button that shows the user input dialog
+                 * for adding RSS feed URLs.
+                 * @returns {Application}
+                 */ 
+                handleShowAddURLDialogButtonClick() {
+                    const addUrlButtonId = 'add-feed-url-dialog-open-button';
+                    const addUrlButton = document.getElementById(addUrlButtonId);
+                    if (addUrlButton) {
+                        addUrlButton.addEventListener('click', this.onShowAddURLDialogButtonClick, {
+                            once: true,
+                        });
+                    }
+                    return this;
+                }
+            
+                /**
+                 * Adds a new RSS feed subscription.
+                 * @param {string} feedUrl
+                 * @returns {Application}
+                 */ 
+                addRSSFeedUrlSubscription(feedUrl) {
+                    if (!isValidUrl(feedUrl)) {
+                        return this;
+                    }
+                    const channelElement = document.createElement('rss-feed-channel');
+                    channelElement.setAttribute('feed-url', feedUrl);
+                    const accordionWrapper = document.querySelector('.main-content__feed-accordion-wrapper');
+                    if (accordionWrapper) {
+                        accordionWrapper.appendChild(channelElement);
+                    }
+                    return this;
+                }
+
+                /**
+                 * @param {string} feedUrl
+                 * @returns {string}
+                 */
+                requestFeedXMLDocument(feedUrl) {
+                    const url = `http://localhost:8080/feed?feed=${encodeURIComponent(feedUrl)}`;
+                    return fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/xml',
+                        },
+                    }).then(
+                        response => response.text()
+                    ).catch((error) => {
+                        const { message } = error;
+                        console.log(message);
+                    });
+                }
+
+                loadRSSFeed(feedUrl) {
+                    return this.requestFeedXMLDocument(feedUrl).then(xmlText => {
+                        const channel = new RSSFeedChannel(feedUrl, xmlText);
+                        // const renderedItems = channel.items.map(renderRSSAccordionItem);
+                        this.#channels.push(channel);
+                        this.storeApplicationState();
+                        return channel;
+                    });
+                }
+            }
+
+            function isValidUrl(urlInput) {
+                try {
+                    const parsedUrl = new URL(urlInput);
+                    if (parsedUrl.protocol !== 'https:') {
+                        return false;
+                    }
+                    return true;
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            /**
+             * @param {string} feedUrl
+             * @returns {string}
+             */
+            function requestFeedXMLDocument(feedUrl) {
+                const url = `http://localhost:8080/feed?feed=${encodeURIComponent(feedUrl)}`;
+                return fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/xml',
+                    },
+                }).then(
+                    response => response.text()
+                ).catch((error) => {
+                    const { message } = error;
+                    console.log(message);
+                });
+            }
+
+            // const feedUrls = [
+            //     'https://www.marijuanamoment.net/feed/',
+            //     'https://nysmusic.com/feed/',
+            // ].forEach(feedUrl => {
+            //     const channelElement = document.createElement('rss-feed-channel');
+            //     channelElement.setAttribute('feed-url', feedUrl);
+            //     const accordionWrapper = document.querySelector('.main-content__feed-accordion-wrapper');
+            //     if (accordionWrapper) {
+            //         accordionWrapper.appendChild(channelElement);
+            //     }
+            // });
 
             class RSSFeedItemAccordionElement extends HTMLElement {
                 constructor() {
@@ -418,12 +1009,194 @@
                 }
             }
 
+            class RSSFeedChannelElement extends HTMLElement {
+                constructor() {
+                    super();
+                    const templateElement = document.querySelector('#rss-channel-template');
+                    const shadowRoot = this.attachShadow({ mode: 'open' });
+                    shadowRoot.appendChild(templateElement.content.cloneNode(true));
+                }
+
+                connectedCallback() {
+                    const feedUrl = this.getAttribute('feed-url');
+                    Application.getInstance().loadRSSFeed(feedUrl).then(channel => {
+                        const renderedItems = channel.items.map(renderRSSAccordionItem);
+                        const titleHeader = this.shadowRoot.querySelector('section > header > h1');
+                        if (titleHeader) {
+                            titleHeader.textContent = channel.title;
+                        }
+                        const descriptionHeader = this.shadowRoot.querySelector('section > header > h2');
+                        if (descriptionHeader) {
+                            descriptionHeader.textContent = channel.description;
+                        }
+                        this.append(...renderedItems);
+                    }).catch(console.error);
+                    // requestFeedXMLDocument(feedUrl).then(xmlText => {
+                    //     const channel = new RSSFeedChannel(feedUrl, xmlText);
+                    //     const renderedItems = channel.items.map(renderRSSAccordionItem);
+                    //     const titleHeader = this.shadowRoot.querySelector('section > header > h1');
+                    //     if (titleHeader) {
+                    //         titleHeader.textContent = channel.title;
+                    //     }
+                    //     const descriptionHeader = this.shadowRoot.querySelector('section > header > h2');
+                    //     if (descriptionHeader) {
+                    //         descriptionHeader.textContent = channel.description;
+                    //     }
+                    //     this.append(...renderedItems);
+                    // }).catch(console.error);
+                }
+            }
             
+            class UserInputDialogElement extends HTMLElement {
+                constructor() {
+                    super();
+                    const templateElement = document.querySelector('#user-input-dialog-template');
+                    const shadowRoot = this.attachShadow({ mode: 'open' });
+                    shadowRoot.appendChild(templateElement.content.cloneNode(true));
+                }
+
+                show() {
+                    return new Promise((resolve, reject) => {
+                        const dialogElement = this.shadowRoot.querySelector('dialog');
+                        if (dialogElement) {
+                            
+                            dialogElement.addEventListener('transitionend', () => {
+                                resolve(this);
+                            }, {
+                                once: true,
+                            });
+
+                            if (!dialogElement.classList.contains('visible')) {
+                                dialogElement.classList.add('visible');
+                            } else {
+                                resolve(this);
+                            }
+                        } else {
+                            reject(this);
+                        }
+                    });
+                }
+
+                hide() {
+                    return new Promise((resolve, reject) => {
+                        const dialogElement = this.shadowRoot.querySelector('dialog');
+                        if (dialogElement) {
+
+                            dialogElement.addEventListener('transitionend', () => {
+                                resolve(this);
+                            }, {
+                                once: true,
+                            });
+
+                            if (dialogElement.classList.contains('visible')) {
+                                dialogElement.classList.remove('visible');
+                            } else {
+                                resolve(this);
+                            }
+                        } else {
+                            reject(this);
+                        }
+                    });                    
+                }
+            }
+
+            class AddFeedURLDialogElement extends HTMLElement {
+                constructor() {
+                    super();
+                    const templateElement = document.querySelector('#add-feed-url-dialog-template');
+                    const shadowRoot = this.attachShadow({ mode: 'open' });
+                    shadowRoot.appendChild(templateElement.content.cloneNode(true));
+                    this.onURLInputChange = this.onURLInputChange.bind(this);
+                    this.onCancelButtonClick = this.onCancelButtonClick.bind(this);
+                    this.onAddButtonClick = this.onAddButtonClick.bind(this);
+                }
+
+                connectedCallback() {
+                    const urlInputField = this.shadowRoot.querySelector('input[type="url"]');
+                    const addButton = this.shadowRoot.querySelector('button.dialog-button__ok');
+                    const cancelButton = this.shadowRoot.querySelector('button.dialog-button__cancel');
+                    if (urlInputField) {
+                        urlInputField.addEventListener('keyup', this.onURLInputChange);
+                    }
+                    if (addButton) {
+                        addButton.addEventListener('click', this.onAddButtonClick);
+                    }
+                    if (cancelButton) {
+                        cancelButton.addEventListener('click', this.onCancelButtonClick);
+                    }
+                }
+
+                disconnectCallback() {
+                    const urlInputField = this.shadowRoot.querySelector('input[type="url"]');
+                    const addButton = this.shadowRoot.querySelector('button.dialog-button__ok');
+                    const cancelButton = this.shadowRoot.querySelector('button.dialog-button__cancel');
+                    if (urlInputField) {
+                        urlInputField.removeEventListener('keyup', this.onURLInputChange);
+                    }
+                    if (addButton) {
+                        addButton.removeEventListener('click', this.onAddButtonClick);
+                    }
+                    if (cancelButton) {
+                        cancelButton.removeEventListener('click', this.onCancelButtonClick);
+                    }
+                }
+
+                onURLInputChange(e) {
+                    // Toggle the Add button's disabled state based on input field validity.
+                    const { target : { validity : { valid = false } } } = e;
+                    const isValid = e.target.checkValidity();
+                    const addButton = this.shadowRoot.querySelector('button.dialog-button__ok');
+                    if (addButton) {
+                        if (isValid && addButton.hasAttribute('disabled')) {
+                            addButton.removeAttribute('disabled');
+                        } else if (!isValid && !addButton.hasAttribute('disabled')) {
+                            addButton.setAttribute('disabled', '');
+                        }
+                    }
+                }
+
+                onCancelButtonClick(e) {
+                    Application.getInstance().hideAddFeedURLDialog();
+                }
+
+                onAddButtonClick(e) {
+                    const urlInputField = this.shadowRoot.querySelector('input[type="url"]');
+                    const urlValue = urlInputField?.value ?? '';
+                    if (urlInputField.validity.valid && isValidUrl(urlValue)) {
+                        Application.getInstance()
+                            .addRSSFeedUrlSubscription(urlValue)
+                            .hideAddFeedURLDialog();
+                    }
+                }
+
+                show() {
+                    return new Promise((resolve, reject) => {
+                        const userInputDialogElement = this.shadowRoot.querySelector('user-input-dialog');
+                        if (userInputDialogElement) {
+                            userInputDialogElement.show().then(() => resolve(this)).catch(() => reject(this));
+                        } else {
+                            reject(this);
+                        }
+                    });
+                }
+
+                hide() {
+                    return new Promise((resolve, reject) => {
+                        const userInputDialogElement = this.shadowRoot.querySelector('user-input-dialog');
+                        if (userInputDialogElement) {
+                            userInputDialogElement.hide().then(() => resolve(this)).catch(() => reject(this));
+                        } else {
+                            reject(this);
+                        }
+                    });
+                }
+            }
+
             window.customElements.define('rss-feed-item-accordion', RSSFeedItemAccordionElement);
-
-
+            window.customElements.define('rss-feed-channel', RSSFeedChannelElement);
+            window.customElements.define('user-input-dialog', UserInputDialogElement);
+            window.customElements.define('add-feed-url-dialog', AddFeedURLDialogElement);
             function showUpdateNotification() {
-                // Notify user about app update
                 if (confirm('New version available. Update now?')) {
                     window.location.reload();
                 }
@@ -448,6 +1221,14 @@
                     })
                 })
             }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                Application.getInstance().loadApplicationState().handleShowAddURLDialogButtonClick();
+            });
+
+            window.addEventListener('unload', () => {
+                Application.getInstance().storeApplicationState();
+            });
         </script>
     </body>
 </html>

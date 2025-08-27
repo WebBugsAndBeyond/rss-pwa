@@ -26,8 +26,6 @@ app.use((err, req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-    // const indexPath = path.join(__dirname, 'index.html');
-    // res.sendFile(indexPath);
     res.redirect(308, '/index.html');
 });
 
