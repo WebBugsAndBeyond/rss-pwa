@@ -8,13 +8,13 @@ The application consists of a HTML file in public/index.html which contains HTML
 
 In addition to the static files there is also a very simple Express server in server.js and rss.js which runs a HTTP server to serve the HTML, and a proxy to perform the cross-origin request for RSS feed XML documents.
 
-At this time as this is being spiked out there is only support for a single hard-coded RSS feed for [Marijuana Moment&apos;s](https://www.marijuanamoment.net/) [RSS feed](https://www.marijuanamoment.net/feed/). 
+## Subscription Management
 
-More will come...
+Subscriptions are managed via Local Storage. Subscriptions can be added by invoking the "+" affordance at the top right, and entering a URL for a RSS feed in the dialog box, and using the "Add" button. The specified feed will automatically be loaded.
 
 ## How To Run
 
 Just use Node to run the server.js file, and it will run on 8080.
 
-```$ node server.js```
+```$ npm run serve```
 
