@@ -176,6 +176,11 @@
                 article > div .description {
                     font-size: 12px;
                 }
+                article > div .description img {
+                    object-fit: contain;
+                    width: 100%;
+                    height: auto;
+                }
             </style>
             <article>
                 <h1 part="header"><button class="title"><slot name="title"></slot></button></h1>
@@ -888,6 +893,10 @@
                     return this;
                 }
 
+                createRSSFeedChannelElementsFromState() {
+                    this.#channels.forEach(channel => this.addRSSFeedUrlSubscription(channel.feedUrl));
+                }
+
                 /**
                  * @param {string} feedUrl
                  * @returns {string}
@@ -1223,7 +1232,10 @@
             }
 
             document.addEventListener('DOMContentLoaded', () => {
-                Application.getInstance().loadApplicationState().handleShowAddURLDialogButtonClick();
+                Application.getInstance()
+                    .loadApplicationState()
+                    .handleShowAddURLDialogButtonClick()
+                    .createRSSFeedChannelElementsFromState();
             });
 
             window.addEventListener('unload', () => {
